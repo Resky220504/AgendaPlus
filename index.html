@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sistema de gestão de pacientes para clínicas e consultórios">
+    <title>Gestão de Pacientes</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <h1 class="nome-empresa">Espaço Vanessa Resky</h1>
+    </header>
+
+    <nav id="nav-principal" aria-label="Navegação principal">
+        <button data-secao="inicio" aria-label="Início"><i class="fas fa-home"></i> Início</button>
+        <button data-secao="pacientes" aria-label="Pacientes"><i class="fas fa-users"></i> Pacientes</button>
+        <button data-secao="agenda" aria-label="Agenda"><i class="fas fa-calendar-alt"></i> Agenda</button>
+        <button data-secao="financeiro" aria-label="Financeiro"><i class="fas fa-dollar-sign"></i> Financeiro</button>
+    </nav>
+
+    <main>
+        <section id="inicio">
+            <h2><i class="fas fa-clock"></i> Próximos Agendamentos</h2>
+            <div id="proximos-agendamentos" class="lista-container"></div>
+        </section>
+
+        <section id="pacientes" class="hidden">
+            <h2>Cadastro de Pacientes</h2>
+            <form id="form-paciente">
+                <fieldset><legend>Dados Pessoais</legend>
+                    <input type="text" id="nome-paciente" placeholder="Nome completo*" required>
+                    <input type="text" onfocus="(this.type='date')" onblur="(this.type='text')" id="nascimento-paciente" placeholder="Data de Nascimento">
+                    <input type="text" id="profissao-paciente" placeholder="Profissão">
+                    <input type="tel" id="telefone-paciente" placeholder="(XX) XXXXX-XXXX">
+                </fieldset>
+                <fieldset><legend>Endereço</legend>
+                    <input type="text" id="cep-paciente" placeholder="CEP" maxlength="9">
+                    <input type="text" id="logradouro-paciente" placeholder="Logradouro">
+                    <input type="text" id="numero-paciente" placeholder="Número">
+                    <input type="text" id="bairro-paciente" placeholder="Bairro">
+                    <input type="text" id="cidade-paciente" placeholder="Cidade">
+                    <input type="text" id="estado-paciente" placeholder="Estado">
+                </fieldset>
+                <textarea id="obs-paciente" placeholder="Observações importantes" class="full-width"></textarea>
+                <button type="submit" class="btn btn-primary full-width"><i class="fas fa-save"></i> Salvar Paciente</button>
+            </form>
+            <hr>
+            <h2><i class="fas fa-users"></i> Pacientes Cadastrados</h2>
+            <div id="lista-pacientes" class="lista-container"></div>
+        </section>
+
+        <section id="agenda" class="hidden">
+            <h2><i class="fas fa-calendar-plus"></i> Novo Agendamento</h2>
+            <form id="form-agendamento">
+                <label for="select-paciente-agenda">Paciente</label>
+                <select id="select-paciente-agenda" required><option value="">Selecione um paciente</option></select>
+                <label for="data-agendamento">Data e Hora</label>
+                <input type="datetime-local" id="data-agendamento" required>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-calendar-check"></i> Marcar Horário</button>
+            </form>
+            <hr>
+            <h2><i class="fas fa-calendar-alt"></i> Todos os Horários</h2>
+            <div id="lista-agendamentos" class="lista-container"></div>
+        </section>
+        
+        <section id="financeiro" class="hidden">
+            <h2><i class="fas fa-chart-line"></i> Resumo Financeiro</h2>
+            <div class="resumo-financeiro">
+                <div class="card-financeiro">
+                    <h3><i class="fas fa-wallet"></i> Recebido (Mês Atual)</h3>
+                    <p id="total-pago">R$ 0,00</p>
+                </div>
+            </div>
+            <hr>
+            <h3><i class="fas fa-history"></i> Histórico de Transações Concluídas</h3>
+            <div id="lista-financeiro" class="lista-container"></div>
+        </section>
+    </main>
+
+    <div id="modal-visualizar-paciente" class="modal"><div class="modal-content"><button class="modal-close">&times;</button><h2 id="modal-visualizar-titulo">Detalhes do Paciente</h2><div id="modal-visualizar-corpo"></div></div></div>
+    
+    <div id="modal-editar-paciente" class="modal"><div class="modal-content"><button class="modal-close">&times;</button><h2>Editar Paciente</h2>
+        <form id="form-editar-paciente">
+            <input type="hidden" id="editar-id-paciente">
+            <label for="editar-nome-paciente">Nome:</label><input type="text" id="editar-nome-paciente" required>
+            <label for="editar-nascimento-paciente">Data de Nascimento:</label><input type="date" id="editar-nascimento-paciente">
+            <label for="editar-profissao-paciente">Profissão:</label><input type="text" id="editar-profissao-paciente">
+            <label for="editar-telefone-paciente">Telefone:</label><input type="tel" id="editar-telefone-paciente">
+            <label for="editar-cep-paciente">CEP:</label><input type="text" id="editar-cep-paciente" maxlength="9">
+            <label for="editar-logradouro-paciente">Logradouro:</label><input type="text" id="editar-logradouro-paciente">
+            <label for="editar-numero-paciente">Número:</label><input type="text" id="editar-numero-paciente">
+            <label for="editar-bairro-paciente">Bairro:</label><input type="text" id="editar-bairro-paciente">
+            <label for="editar-cidade-paciente">Cidade:</label><input type="text" id="editar-cidade-paciente">
+            <label for="editar-estado-paciente">Estado:</label><input type="text" id="editar-estado-paciente">
+            <label for="editar-obs-paciente">Observações:</label><textarea id="editar-obs-paciente"></textarea>
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+        </form>
+    </div></div>
+
+    <div id="modal-editar-agendamento" class="modal"><div class="modal-content"><button class="modal-close">&times;</button><h2>Editar Agendamento</h2>
+        <form id="form-editar-agendamento">
+            <input type="hidden" id="editar-id-agendamento">
+            <label for="editar-data-agendamento">Nova Data e Hora:</label><input type="datetime-local" id="editar-data-agendamento" required>
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+        </form>
+    </div></div>
+
+    <div id="modal-pagamento" class="modal"><div class="modal-content"><button class="modal-close">&times;</button><h2>Finalizar Atendimento</h2>
+        <form id="form-pagamento">
+            <input type="hidden" id="pagamento-id-agendamento">
+            <label for="pagamento-valor">Valor Cobrado (R$):</label><input type="number" id="pagamento-valor" step="0.01" min="0" required placeholder="Ex: 150.00">
+            <label for="pagamento-metodo">Forma de Pagamento:</label><select id="pagamento-metodo" required><option value="">Selecione</option><option value="PIX">PIX</option><option value="Dinheiro">Dinheiro</option><option value="Crédito">Crédito</option><option value="Débito">Débito</option></select>
+            <button type="submit" class="btn btn-primary">Registrar Pagamento</button>
+        </form>
+    </div></div>
+
+    <div id="toast-container"></div>
+    <script src="script.js"></script>
+</body>
+</html>
