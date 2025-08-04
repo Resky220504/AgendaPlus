@@ -33,7 +33,7 @@
                     <input type="text" id="nome-paciente" placeholder="Nome completo*" required>
                     <input type="text" onfocus="(this.type='date')" onblur="(this.type='text')" id="nascimento-paciente" placeholder="Data de Nascimento">
                     <input type="text" id="profissao-paciente" placeholder="Profissão">
-                    <input type="tel" id="telefone-paciente" placeholder="(XX) XXXXX-XXXX">
+                    <input type="tel" id="telefone-paciente" placeholder="(XX) XXXXX-XXXX" maxlength="15">
                 </fieldset>
                 <fieldset><legend>Endereço</legend>
                     <input type="text" id="cep-paciente" placeholder="CEP" maxlength="9">
@@ -70,11 +70,33 @@
             <div class="resumo-financeiro">
                 <div class="card-financeiro">
                     <h3><i class="fas fa-wallet"></i> Recebido (Mês Atual)</h3>
-                    <p id="total-pago">R$ 0,00</p>
+                    <p id="total-pago-mes">R$ 0,00</p>
                 </div>
             </div>
             <hr>
-            <h3><i class="fas fa-history"></i> Histórico de Transações Concluídas</h3>
+            <h3><i class="fas fa-history"></i> Histórico de Transações</h3>
+            <div class="filtros-financeiro">
+                <div class="filtro-grupo">
+                    <label for="filtro-metodo">Forma de Pagamento</label>
+                    <select id="filtro-metodo">
+                        <option value="">Todos</option>
+                        <option value="PIX">PIX</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Crédito">Crédito</option>
+                        <option value="Débito">Débito</option>
+                    </select>
+                </div>
+                <div class="filtro-grupo">
+                    <label for="filtro-data-inicio">Data Início</label>
+                    <input type="date" id="filtro-data-inicio">
+                </div>
+                <div class="filtro-grupo">
+                    <label for="filtro-data-fim">Data Fim</label>
+                    <input type="date" id="filtro-data-fim">
+                </div>
+                <button id="aplicar-filtros" class="btn btn-primary">Aplicar</button>
+                <button id="limpar-filtros" class="btn">Limpar</button>
+            </div>
             <div id="lista-financeiro" class="lista-container"></div>
         </section>
     </main>
@@ -87,7 +109,7 @@
             <label for="editar-nome-paciente">Nome:</label><input type="text" id="editar-nome-paciente" required>
             <label for="editar-nascimento-paciente">Data de Nascimento:</label><input type="date" id="editar-nascimento-paciente">
             <label for="editar-profissao-paciente">Profissão:</label><input type="text" id="editar-profissao-paciente">
-            <label for="editar-telefone-paciente">Telefone:</label><input type="tel" id="editar-telefone-paciente">
+            <label for="editar-telefone-paciente">Telefone:</label><input type="tel" id="editar-telefone-paciente" maxlength="15">
             <label for="editar-cep-paciente">CEP:</label><input type="text" id="editar-cep-paciente" maxlength="9">
             <label for="editar-logradouro-paciente">Logradouro:</label><input type="text" id="editar-logradouro-paciente">
             <label for="editar-numero-paciente">Número:</label><input type="text" id="editar-numero-paciente">

@@ -21,6 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
             schedules: document.getElementById('lista-agendamentos'),
             upcoming: document.getElementById('proximos-agendamentos'),
             financial: document.getElementById('lista-financeiro'),
+        },
+        filters: {
+            method: document.getElementById('filtro-metodo'),
+            dateStart: document.getElementById('filtro-data-inicio'),
+            dateEnd: document.getElementById('filtro-data-fim'),
+            apply: document.getElementById('aplicar-filtros'),
+            clear: document.getElementById('limpar-filtros')
         }
     };
 
@@ -29,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.values(dom.forms).forEach(form => form?.addEventListener('submit', handleFormSubmit));
     dom.lists.patients.addEventListener('click', handlePatientListClick);
     dom.lists.schedules.addEventListener('click', handleScheduleListClick);
+    dom.lists.upcoming.addEventListener('click', handleScheduleListClick); // Para futuros botões
     
     Object.values(dom.modals).forEach(modal => {
         if(modal) {
@@ -38,10 +46,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Máscaras e ViaCEP
-    document.getElementById('telefone-paciente').addEventListener('input', applyPhoneMask);
-    document.getElementById('editar-telefone-paciente').addEventListener('input', applyPhoneMask);
-    setupCepListener('');
-    setupCepListener('editar-');
+    ['telefone-paciente', 'editar-telefone-paciente'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', applyPhoneMask);
+    });
+    document.getElementById('cep-paciente')?.addEventListener('blur', (e) => fetchAddress(e.target.value, ''));
+    document.getElementById('editar-cep-paciente')?.addEventListener('blur', (e) => fetchAddress(e.target.value, 'editar-'));
+    
+    // Filtros financeiros
+    dom.filters.apply?.addEventListener('click', loadFinancial);
+    dom.filters.clear?.addEventListener('click', () => {
+        dom.filters.method.value = '';
+        dom.filters.dateStart.value = '';
+        dom.filters.dateEnd.value = '';
+        loadFinancial();
+    });
     
     // ========== INICIAÇÃO ==========
     showSection('inicio');
@@ -86,30 +104,41 @@ const openModal = (modal) => modal.classList.add('active');
 const closeModal = (modal) => modal.classList.remove('active');
 
 function applyPhoneMask(event) {
-    let v = event.target.value.replace(/\D/g,'').slice(0,11);
-    if (v.length >= 7) v = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
-    else if (v.length >= 3) v = `(${v.slice(0,2)}) ${v.slice(2)}`;
+    let v = event.target.value.replace(/\D/g,'');
+    if (v.length > 10) { // Celular com 9º dígito
+        v = v.replace(/^(\d\d)(\d{5})(\d{4}).*/,"($1) $2-$3");
+    } else if (v.length > 5) { // Telefone fixo
+        v = v.replace(/^(\d\d)(\d{4})(\d{0,4}).*/,"($1) $2-$3");
+    } else if (v.length > 2) {
+        v = v.replace(/^(\d\d)(\d{0,5}).*/,"($1) $2");
+    } else {
+        v = v.replace(/^(\d*)/, "($1");
+    }
     event.target.value = v;
 }
 
-function setupCepListener(prefix) {
-    document.getElementById(`${prefix}cep-paciente`)?.addEventListener('blur', (e) => {
-        const cep = e.target.value.replace(/\D/g, '');
-        if (cep.length === 8) fetch(`https://viacep.com.br/ws/${cep}/json/`).then(res => res.json()).then(data => {
-            if (!data.erro) {
-                document.getElementById(`${prefix}logradouro-paciente`).value = data.logradouro;
-                document.getElementById(`${prefix}bairro-paciente`).value = data.bairro;
-                document.getElementById(`${prefix}cidade-paciente`).value = data.localidade;
-                document.getElementById(`${prefix}estado-paciente`).value = data.uf;
-                document.getElementById(`${prefix}numero-paciente`).focus();
-            } else showToast('CEP não encontrado', 'error');
-        }).catch(() => showToast('Erro ao buscar CEP', 'error'));
-    });
+async function fetchAddress(cepValue, prefix) {
+    const cep = cepValue.replace(/\D/g, '');
+    if (cep.length !== 8) return;
+    try {
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await response.json();
+        if (!data.erro) {
+            document.getElementById(`${prefix}logradouro-paciente`).value = data.logradouro;
+            document.getElementById(`${prefix}bairro-paciente`).value = data.bairro;
+            document.getElementById(`${prefix}cidade-paciente`).value = data.localidade;
+            document.getElementById(`${prefix}estado-paciente`).value = data.uf;
+            document.getElementById(`${prefix}numero-paciente`).focus();
+        } else {
+            showToast('CEP não encontrado', 'error');
+        }
+    } catch (error) {
+        showToast('Erro ao buscar CEP', 'error');
+    }
 }
 
-function formatDate(dateString) {
+function formatDate(dateString, options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) {
     if (!dateString) return 'Data não informada';
-    const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     return new Date(dateString).toLocaleDateString('pt-BR', options);
 }
 
@@ -120,17 +149,20 @@ function toInputDateTime(isoString) {
     return date.toISOString().slice(0, 16);
 }
 
+const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 // ========== LÓGICA DE EVENTOS ==========
 function handleFormSubmit(event) {
     event.preventDefault();
     const formId = event.target.id;
-    switch(formId) {
-        case 'form-paciente': savePatient(event.target); break;
-        case 'form-editar-paciente': savePatientEdit(event.target); break;
-        case 'form-agendamento': saveSchedule(event.target); break;
-        case 'form-editar-agendamento': saveScheduleEdit(event.target); break;
-        case 'form-pagamento': savePayment(event.target); break;
-    }
+    const actions = {
+        'form-paciente': () => savePatient(new FormData(event.target), event.target),
+        'form-editar-paciente': () => savePatientEdit(new FormData(event.target), event.target),
+        'form-agendamento': () => saveSchedule(event.target),
+        'form-editar-agendamento': () => saveScheduleEdit(event.target),
+        'form-pagamento': () => savePayment(event.target)
+    };
+    actions[formId]?.();
 }
 
 function handlePatientListClick(event) {
@@ -152,21 +184,21 @@ function handleScheduleListClick(event) {
 }
 
 // ========== LÓGICA DE PACIENTES ==========
-function savePatient(form) {
-    const nome = form.querySelector('#nome-paciente').value.trim();
+function savePatient(formData, form) {
+    const nome = formData.get('nome-paciente')?.trim();
     if (!nome) return showToast('O nome é obrigatório', 'error');
     const newPatient = {
         id: Date.now(),
         nome,
-        nascimento: form.querySelector('#nascimento-paciente').value,
-        profissao: form.querySelector('#profissao-paciente').value.trim(),
-        telefone: form.querySelector('#telefone-paciente').value.trim(),
+        nascimento: formData.get('nascimento-paciente'),
+        profissao: formData.get('profissao-paciente')?.trim(),
+        telefone: formData.get('telefone-paciente')?.trim(),
         endereco: {
-            cep: form.querySelector('#cep-paciente').value.trim(), logradouro: form.querySelector('#logradouro-paciente').value.trim(),
-            numero: form.querySelector('#numero-paciente').value.trim(), bairro: form.querySelector('#bairro-paciente').value.trim(),
-            cidade: form.querySelector('#cidade-paciente').value.trim(), estado: form.querySelector('#estado-paciente').value.trim(),
+            cep: formData.get('cep-paciente')?.trim(), logradouro: formData.get('logradouro-paciente')?.trim(),
+            numero: formData.get('numero-paciente')?.trim(), bairro: formData.get('bairro-paciente')?.trim(),
+            cidade: formData.get('cidade-paciente')?.trim(), estado: formData.get('estado-paciente')?.trim(),
         },
-        obs: form.querySelector('#obs-paciente').value.trim()
+        obs: formData.get('obs-paciente')?.trim()
     };
     const patients = getDB('patients');
     patients.push(newPatient);
@@ -177,7 +209,7 @@ function savePatient(form) {
 }
 
 function loadPatients() {
-    const patients = getDB('patients').sort((a,b) => a.nome.localeCompare(b.nome));
+    const patients = getDB('patients').sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     const list = document.getElementById('lista-pacientes');
     list.innerHTML = patients.length === 0 ? '<p>Nenhum paciente cadastrado.</p>' : patients.map(p => `
         <div class="item-lista" data-id="${p.id}">
@@ -194,13 +226,13 @@ function loadPatients() {
 function viewPatient(id) {
     const patient = getDB('patients').find(p => p.id === id);
     if (!patient) return;
-    const { nome, nascimento, profissao, telefone, endereco, obs } = patient;
+    const { nome, nascimento, profissao, telefone, endereco = {}, obs } = patient;
     const content = `
         <p><strong>Nome:</strong> ${nome}</p>
-        <p><strong>Nascimento:</strong> ${nascimento ? new Date(nascimento).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'Não informado'}</p>
+        <p><strong>Nascimento:</strong> ${nascimento ? formatDate(nascimento, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}) : 'Não informado'}</p>
         <p><strong>Profissão:</strong> ${profissao || 'Não informado'}</p>
         <p><strong>Telefone:</strong> ${telefone || 'Não informado'}</p>
-        <p><strong>Endereço:</strong> ${endereco && endereco.logradouro ? `${endereco.logradouro}, ${endereco.numero} - ${endereco.bairro}, ${endereco.cidade}-${endereco.estado}` : 'Não informado'}</p>
+        <p><strong>Endereço:</strong> ${endereco.logradouro ? `${endereco.logradouro}, ${endereco.numero} - ${endereco.bairro}, ${endereco.cidade}-${endereco.estado}` : 'Não informado'}</p>
         <p><strong>Observações:</strong> ${obs || 'Nenhuma'}</p>
     `;
     document.getElementById('modal-visualizar-corpo').innerHTML = content;
@@ -225,6 +257,7 @@ function openPatientEditModal(id) {
     form.querySelector('#editar-cidade-paciente').value = endereco.cidade || '';
     form.querySelector('#editar-estado-paciente').value = endereco.estado || '';
     form.querySelector('#editar-obs-paciente').value = patient.obs || '';
+    applyPhoneMask({ target: form.querySelector('#editar-telefone-paciente') }); // Formata o telefone ao abrir
     openModal(modal);
 }
 
@@ -252,6 +285,7 @@ function savePatientEdit(form) {
     showToast('Paciente atualizado com sucesso!', 'success');
     closeModal(document.getElementById('modal-editar-paciente'));
     loadPatients();
+    loadPatientSelect(); // Atualiza a lista de pacientes nos selects
 }
 
 function deletePatient(id) {
@@ -266,10 +300,12 @@ function deletePatient(id) {
 // ========== LÓGICA DE AGENDAMENTOS ==========
 function loadPatientSelect() {
     const select = document.getElementById('select-paciente-agenda');
+    const currentVal = select.value;
     select.innerHTML = '<option value="">Selecione um paciente</option>';
-    getDB('patients').sort((a,b) => a.nome.localeCompare(b.nome)).forEach(p => {
+    getDB('patients').sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).forEach(p => {
         select.innerHTML += `<option value="${p.id}">${p.nome}</option>`;
     });
+    select.value = currentVal;
 }
 
 function saveSchedule(form) {
@@ -285,6 +321,7 @@ function saveSchedule(form) {
     showToast('Agendamento salvo com sucesso!', 'success');
     form.reset();
     loadSchedules();
+    loadUpcomingSchedules();
 }
 
 function loadSchedules() {
@@ -303,8 +340,9 @@ function loadSchedules() {
 }
 
 function loadUpcomingSchedules() {
+    const now = new Date();
     const upcoming = getDB('schedules')
-        .filter(s => new Date(s.date) >= new Date())
+        .filter(s => new Date(s.date) >= now)
         .sort((a,b) => new Date(a.date) - new Date(b.date))
         .slice(0, 5);
     const list = document.getElementById('proximos-agendamentos');
@@ -362,6 +400,9 @@ function savePayment(form) {
     const amount = parseFloat(form.querySelector('#pagamento-valor').value);
     if (isNaN(amount) || amount <= 0) return showToast('Por favor, insira um valor válido.', 'error');
     
+    const paymentMethod = form.querySelector('#pagamento-metodo').value;
+    if (!paymentMethod) return showToast('Selecione uma forma de pagamento.', 'error');
+    
     const newTransaction = {
         id: Date.now(),
         scheduleId: schedule.id,
@@ -369,40 +410,87 @@ function savePayment(form) {
         patientName: schedule.patientName,
         paymentDate: new Date().toISOString(),
         amount: amount,
-        method: form.querySelector('#pagamento-metodo').value,
+        method: paymentMethod,
     };
     
-    setDB('transactions', [...getDB('transactions'), newTransaction]);
+    const transactions = getDB('transactions');
+    transactions.push(newTransaction);
+    setDB('transactions', transactions);
+    
     setDB('schedules', getDB('schedules').filter(s => s.id !== scheduleId));
 
     showToast('Pagamento registrado com sucesso!', 'success');
     closeModal(document.getElementById('modal-pagamento'));
     form.reset();
-    loadSectionData(document.querySelector('main section:not(.hidden)').id);
+    
+    // Recarrega todas as seções afetadas
+    if(document.getElementById('agenda')?.classList.contains('active')) loadSchedules();
+    if(document.getElementById('inicio')?.classList.contains('active')) loadUpcomingSchedules();
+    if(document.getElementById('financeiro')?.classList.contains('active')) loadFinancial();
+    
 }
 
 function loadFinancial() {
-    const transactions = getDB('transactions');
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    const allTransactions = getDB('transactions');
+    const now = new Date();
+
+    // Calcula o total do mês atual independentemente dos filtros
+    const currentMonthTransactions = allTransactions.filter(t => {
+        const transactionDate = new Date(t.paymentDate);
+        return transactionDate.getMonth() === now.getMonth() && transactionDate.getFullYear() === now.getFullYear();
+    });
+    const totalMonth = currentMonthTransactions.reduce((sum, t) => sum + t.amount, 0);
+    // Nota: Certifique-se que no seu HTML o ID é 'total-pago-mes'
+    document.getElementById('total-pago-mes').textContent = formatCurrency(totalMonth);
+
+    // Aplica filtros para a lista de transações
+    let filteredTransactions = [...allTransactions];
     
-    const monthlyTotal = transactions
-        .filter(t => {
-            const tDate = new Date(t.paymentDate);
-            return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, t) => sum + t.amount, 0);
+    // Filtro por método
+    const filterMethod = dom.filters.method.value;
+    if (filterMethod) {
+        // Compara os textos em minúsculas e sem espaços extras para evitar erros
+        filteredTransactions = filteredTransactions.filter(t => 
+            t.method && t.method.trim().toLowerCase() === filterMethod.toLowerCase()
+        );
+    }
+    
+    // Filtro por data de início (com validação)
+    const startDateValue = dom.filters.dateStart.value;
+    if (startDateValue) {
+        const startDate = new Date(startDateValue);
+        if (!isNaN(startDate.getTime())) {
+            startDate.setUTCHours(0, 0, 0, 0);
+            filteredTransactions = filteredTransactions.filter(t => new Date(t.paymentDate) >= startDate);
+        }
+    }
+    
+    // Filtro por data de fim (com validação)
+    const endDateValue = dom.filters.dateEnd.value;
+    if (endDateValue) {
+        const endDate = new Date(endDateValue);
+        if (!isNaN(endDate.getTime())) {
+            endDate.setUTCHours(23, 59, 59, 999);
+            filteredTransactions = filteredTransactions.filter(t => new Date(t.paymentDate) <= endDate);
+        }
+    }
 
-    document.getElementById('total-pago').textContent = monthlyTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    filteredTransactions.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
 
+    // Exibe a lista de transações filtrada
     const list = document.getElementById('lista-financeiro');
-    list.innerHTML = transactions.length === 0 ? '<p>Nenhuma transação registrada.</p>' : transactions
-        .sort((a,b) => new Date(b.paymentDate) - new Date(a.paymentDate))
-        .map(t => `
-        <div class="item-lista">
-            <div class="info"><strong>${t.patientName}</strong><small>Pagamento em ${formatDate(t.paymentDate)}</small></div>
-            <div class="info" style="text-align: right;"><strong>${t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong><small>Método: ${t.method}</small></div>
-        </div>
-    `).join('');
+    list.innerHTML = filteredTransactions.length === 0 
+        ? '<p>Nenhuma transação encontrada para os filtros aplicados.</p>'
+        : filteredTransactions.map(t => `
+            <div class="item-lista">
+                <div class="info">
+                    <strong>${t.patientName}</strong>
+                    <small>Pagamento em ${formatDate(t.paymentDate)}</small>
+                </div>
+                <div class="info" style="text-align: right;">
+                    <strong>${formatCurrency(t.amount)}</strong>
+                    <small>Método: ${t.method}</small>
+                </div>
+            </div>
+        `).join('');
 }
